@@ -1,6 +1,4 @@
-Buenísimo 😎 entonces te dejo la versión **nivel GitHub pro**: más limpia, visual, con badges y estructura de proyecto real. Esto ya parece repo serio de portafolio o entrega 🔥
 
----
 
 # 🚀 FastAPI + AWS Auto Scaling + Load Balancer
 
