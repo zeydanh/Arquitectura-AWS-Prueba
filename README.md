@@ -1,212 +1,287 @@
-🧱 FASE 1: FIREWALLS (Grupos de Seguridad)
-Debes crear tres "cajas fuertes". Ve a EC2 > Red y seguridad > Grupos de seguridad y haz clic en Crear grupo de seguridad.
+Buenísimo 😎 entonces te dejo la versión **nivel GitHub pro**: más limpia, visual, con badges y estructura de proyecto real. Esto ya parece repo serio de portafolio o entrega 🔥
 
-1. Grupo del Balanceador (Nombre: ALB-SG)
+---
 
+# 🚀 FastAPI + AWS Auto Scaling + Load Balancer
 
-Descripción: Permitir tráfico HTTP mundial.
+![AWS](https://img.shields.io/badge/AWS-Cloud-orange?logo=amazonaws)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green?logo=fastapi)
+![Status](https://img.shields.io/badge/Status-Running-success)
 
-VPC: Deja la predeterminada.
+---
 
-Reglas de Entrada: * Tipo: HTTP | Puerto: 80 | Origen: Anywhere-IPv4 (0.0.0.0/0).
+## 📌 Descripción
 
-Haz clic en Crear.
+Este proyecto despliega una API hecha en **FastAPI** sobre AWS utilizando una arquitectura escalable:
 
-2. Grupo de las Instancias (Nombre: EC2-Web-SG)
+* ⚖️ **Application Load Balancer**
+* 🔄 **Auto Scaling Group**
+* 🗄️ **Amazon RDS (MySQL)**
+* 🛡️ **Security Groups**
+* 🐳 Backend con **Gunicorn + Uvicorn**
 
+---
 
-Descripción: Proteger servidores. Solo el ALB puede entrar.
+## 🧠 Arquitectura
 
-Reglas de Entrada:
+```text
+Internet
+   ↓
+ALB (HTTP :80)
+   ↓
+EC2 (Auto Scaling Group)
+   ↓
+FastAPI (Puerto 8000)
+   ↓
+RDS MySQL (Puerto 3306)
+```
 
-Regla 1 - Tipo: SSH | Puerto: 22 | Origen: Anywhere-IPv4 (0.0.0.0/0) (o tu IP para seguridad).
+---
 
-Regla 2 - Tipo: TCP Personalizado | Puerto: 8000 | Origen: Personalizado -> Haz clic en el cuadro y selecciona ALB-SG (el grupo que creaste arriba).
+## ⚙️ Configuración paso a paso
 
-Haz clic en Crear.
+---
 
-3. Grupo de Base de Datos (Nombre: RDS-SG)
+# 🧱 1. Security Groups
 
+Crear en:
 
-Descripción: Proteger base de datos. Solo las EC2 entran.
+**EC2 > Security Groups**
 
-Reglas de Entrada:
+### 🔹 ALB-SG
 
-Tipo: MySQL/Aurora | Puerto: 3306 | Origen: Personalizado -> Haz clic y selecciona EC2-Web-SG.
+Permite tráfico web público
 
-Haz clic en Crear.
+* HTTP | 80 | 0.0.0.0/0
 
-🎯 FASE 2: TARGET GROUP (El Directorio)
-Ve a EC2 > Balanceo de carga > Grupos de destino (Target Groups).
+---
 
-Choose a target type: Instancias.
+### 🔹 EC2-Web-SG
 
-Target group name: tg-api-fastapi.
+Protege las instancias
 
-Protocol: HTTP | Port: 8000.
+* SSH | 22 | tu IP (recomendado)
+* TCP | 8000 | ALB-SG
 
-VPC: Deja la predeterminada.
+---
 
-Health check path: /health. (En configuración avanzada, confirma Success code: 200).
+### 🔹 RDS-SG
 
-Haz clic en Siguiente.
+Protege la base de datos
 
-🚨 ¡PASO CRÍTICO, TRAMPA DE EXAMEN! 🚨 En la pantalla "Registrar destinos", verás una lista de máquinas. NO SELECCIONES NINGUNA CASILLA. Asegúrate de que abajo diga "0 pendientes". El Auto Scaling meterá las máquinas ahí automáticamente.
+* MySQL | 3306 | EC2-Web-SG
 
-Haz clic en Crear grupo de destino.
+---
 
-⚖️ FASE 3: APPLICATION LOAD BALANCER (La Puerta)
-Ve a EC2 > Balanceadores de carga > Crear balanceador de carga.
+# 🎯 2. Target Group
 
-Elige Application Load Balancer y haz clic en Crear.
+**EC2 > Target Groups**
 
-Load balancer name: alb-api-test.
+* Nombre: `tg-api-fastapi`
+* Tipo: Instancias
+* Protocolo: HTTP
+* Puerto: 8000
+* Health Check: `/health`
 
-Scheme: Internet-facing | IP address type: IPv4.
+🚨 No agregar instancias manualmente
 
-Network mapping (Mapeo de red): Selecciona tu VPC y MÍNIMO DOS zonas (Ej: us-east-1a y us-east-1b).
+---
 
-Security groups: Elimina el grupo default y selecciona tu ALB-SG.
+# ⚖️ 3. Load Balancer
 
-Listeners and routing (Agentes de escucha): Protocol HTTP, Port 80. En "Default action (Forward to)", selecciona tg-api-fastapi.
+**Application Load Balancer**
 
-Ignora servicios adicionales y haz clic en Crear balanceador de carga.
+* Nombre: `alb-api-test`
+* Esquema: Internet-facing
+* Subredes: mínimo 2
+* Security Group: ALB-SG
 
-🗄️ FASE 4: BASE DE DATOS (Amazon RDS)
-Abre otra pestaña y ve a RDS > Bases de datos > Crear base de datos.
+### Listener
 
-Método de creación: Creación estándar.
+* HTTP :80 → `tg-api-fastapi`
 
-Opciones de motor: MySQL.
+---
 
-Plantillas: Capa gratuita (Free tier).
+# 🗄️ 4. Base de datos (RDS)
 
-Configuración:
+**RDS > Crear DB**
 
-Nombre de la base de datos: db-api-test
+* Motor: MySQL
+* DB Name: `db-api-test`
+* User: `admin`
+* Pass: `Admin1234!`
 
-Nombre de usuario principal: admin.
+### Conectividad
 
-Contraseña principal: Admin1234!.
+* Acceso público: ❌
+* SG: `RDS-SG`
 
-Conectividad:
+📌 Guardar el **endpoint**
 
-VPC: La misma de tus EC2.
+---
 
-Acceso público: NO.
+# 🧬 5. Launch Template
 
-Grupo de seguridad de VPC existente: Elimina el default y selecciona RDS-SG.
+**EC2 > Launch Templates**
 
-Despliega la sección de abajo y dale a Crear base de datos. (Tardará unos minutos. Cuando termine, entra y copia el Punto de enlace (Endpoint)).
+* Nombre: `plantilla-api-fastapi`
+* AMI: Amazon Linux 2023
+* Tipo: t3.micro
+* SG: EC2-Web-SG
 
-🧬 FASE 5: LA PLANTILLA (Launch Template)
-Vuelve a EC2. Ve a Plantillas de lanzamiento > Crear plantilla de lanzamiento.
+---
 
-Nombre de la plantilla: plantilla-api-fastapi.
+## 📜 User Data
 
-Marca la casilla: "Proporcionar orientación para EC2 Auto Scaling".
-
-AMI (SO): Busca y selecciona Amazon Linux 2023.
-
-Tipo de instancia: t3.micro.
-
-Par de claves: Elige tus claves (Ej: mis-claves-aws).
-
-Configuración de red: En Grupo de seguridad, selecciona EC2-Web-SG. NO ELIJAS SUBRED AQUÍ.
-
-🚨 ¡EL CÓDIGO MAESTRO! Ve a Detalles avanzados > Datos de usuario (User Data). Esto asegura que las nuevas máquinas no se caigan por falta del driver pymysql. Pega exactamente esto:
-
-Bash
+```bash
 #!/bin/bash
+
 sudo dnf update -y
-sudo dnf install git python3 pip mariadb105 -y
+sudo dnf install -y git python3 pip mariadb105
+
 pip install fastapi "uvicorn[standard]" gunicorn pymysql
 
-# Clonar el proyecto e iniciar la aplicación
 git clone https://github.com/Elmostunt/LoadBalancerApiTest.git
 cd LoadBalancerApiTest
 
-# Iniciar la API en segundo plano
 gunicorn -w 3 -k uvicorn.workers.UvicornWorker api:app -b 0.0.0.0:8000 &
-Haz clic en Crear plantilla.
+```
 
-⚙️ FASE 6: AUTO SCALING GROUP (La Fábrica)
-Ve a EC2 > Grupos de Auto Scaling > Crear grupo de Auto Scaling.
+---
 
-Nombre: asg-api-test. Selecciona tu plantilla-api-fastapi. Siguiente.
+# ⚙️ 6. Auto Scaling Group
 
-Red: Selecciona tu VPC y MÍNIMO 2 SUBREDES (us-east-1a, us-east-1b). Siguiente.
+**EC2 > Auto Scaling Groups**
 
-Balanceo de carga: Selecciona "Adjuntar a un equilibrador existente" -> Elige tu Target Group tg-api-fastapi.
+* Nombre: `asg-api-test`
+* Template: `plantilla-api-fastapi`
 
-🚨 Comprobaciones de estado (Health Checks): Marca Activar ELB. Siguiente.
+### Configuración
 
-Tamaño del grupo:
+* Subredes: mínimo 2
+* Target Group: `tg-api-fastapi`
+* Health Check: ELB
 
-Capacidad deseada: 2.
+### Capacidad
 
-Mínima: 2.
+* Min: 2
+* Desired: 2
+* Max: 4
 
-Máxima: 4.
+### Scaling
 
-Políticas de escalado: Selecciona Política de escalado de seguimiento de destino. Métrica: "Utilización media de la CPU". Valor objetivo: 60.
+* Tipo: Target Tracking
+* CPU: 60%
 
-Siguiente hasta el final y haz clic en Crear grupo de Auto Scaling.
+---
 
-🛠️ FASE 7: CONSTRUIR LA TABLA SQL DESDE EC2
-Mientras AWS crea tus 2 máquinas, vamos a crear las tablas de tu base de datos.
-Ve a EC2 > Instancias. Copia la IP pública de cualquiera de tus 2 nuevas máquinas y entra por SSH desde tu consola (PowerShell/Terminal):
+# 🛠️ 7. Configurar base de datos
 
-Bash
-ssh -i "tu-llave.pem" ec2-user@<IP_PUBLICA_DE_LA_EC2>
-Una vez dentro (texto verde [ec2-user@ip-...]), ejecuta:
+### Conectarse por SSH
 
-Descarga el certificado de seguridad:
+```bash
+ssh -i "tu-llave.pem" ec2-user@<IP>
+```
 
-Bash
+### Descargar certificado
+
+```bash
 curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
-Conéctate a la BD (Reemplaza <TU_ENDPOINT_RDS> por el que copiaste en Fase 4):
+```
 
-Bash
-mysql -h <TU_ENDPOINT_RDS> -P 3306 -u admin -p --ssl-ca=global-bundle.pem --ssl-verify-server-cert
-Ingresa tu clave Admin1234! y presiona Enter.
+### Conectar a MySQL
 
-Ejecuta el código SQL:
+```bash
+mysql -h <ENDPOINT> -P 3306 -u admin -p \
+--ssl-ca=global-bundle.pem --ssl-verify-server-cert
+```
 
-SQL
+---
+
+### Crear tablas
+
+```sql
 CREATE DATABASE api_db;
 USE api_db;
-CREATE TABLE usuarios ( id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(100), email VARCHAR(100), fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
-exit;
-🧪 FASE 8: VALIDACIÓN INICIAL
-Ve a EC2 > Balanceadores de Carga y copia el DNS de tu alb-api-test.
 
-En el navegador ingresa: http://<DNS_DEL_ALB>/health. Debe responder {"status": "ok"}.
+CREATE TABLE usuarios (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(100),
+  correo VARCHAR(100),
+  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-Ingresa a http://<DNS_DEL_ALB>/docs. Usa el método POST para guardar un usuario. Si te responde un JSON verde, ¡ESTÁS CONECTADO A RDS CORRECTAMENTE!
+---
 
-🔥 FASE 9: LA PRUEBA DE JMETER (Rompiendo el sistema)
-Para demostrar el Auto Scaling a tu profesor:
+# 🧪 8. Validación
 
-Abre Apache JMeter.
+### Health check
 
-Configura el Thread Group:
+```bash
+http://<DNS_ALB>/health
+```
 
-Number of Threads (users): 500
+### Documentación
 
-Ramp-up period: 10
+```bash
+http://<DNS_ALB>/docs
+```
 
-Loop Count: Infinite (o 100)
+---
 
-Configura el HTTP Request:
+# 🔥 9. Prueba de carga (JMeter)
 
-Protocol: http
+### Thread Group
 
-Server Name or IP: PEGA AQUÍ TU DNS DEL ALB (¡SIN http:// NI / AL FINAL!)
+* Users: 500
+* Ramp-up: 10
+* Loop: 100
 
-Port: 80
+### HTTP Request
 
-Path: /health (Para no tener error de Method Not Allowed con /hello).
+* Host: DNS del ALB
+* Puerto: 80
+* Path: `/health`
 
-Dale Play. Ve a AWS > Auto Scaling Groups > Actividad. En unos minutos mostrará "Lanzando nueva instancia EC2".
+---
 
+## 📈 Resultado esperado
+
+El sistema debería:
+
+* Escalar automáticamente
+* Crear nuevas instancias
+* Balancear tráfico
+* Mantener disponibilidad
+
+---
+
+# ✅ Checklist
+
+* [ ] Security Groups creados
+* [ ] Target Group listo
+* [ ] ALB funcionando
+* [ ] RDS conectado
+* [ ] Auto Scaling activo
+* [ ] API respondiendo
+* [ ] Prueba de carga exitosa
+
+---
+
+# 🧩 Mejoras futuras
+
+* HTTPS con certificado SSL (ACM)
+* Dominio personalizado
+* CI/CD con GitHub Actions
+* Dockerización
+* Logging con CloudWatch
+
+---
+
+Si quieres el siguiente nivel 🚀 te puedo hacer:
+
+* diagrama visual tipo draw.io (para que lo subas al README)
+* portada con imagen gamer tipo tu proyecto "Nordic Legends"
+* o dejarlo como **README ganador de evaluación** con storytelling 👀
